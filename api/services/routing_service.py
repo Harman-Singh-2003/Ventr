@@ -13,7 +13,7 @@ from shapely.geometry import LineString
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
-from crime_aware_routing.algorithms.route_optimizer import RouteOptimizer
+from crime_aware_routing.algorithms.cached_route_optimizer import CachedRouteOptimizer
 from crime_aware_routing.core.data_loader import load_crime_data
 from crime_aware_routing.config.routing_config import RoutingConfig
 from api.schemas.routing import RouteRequest, RouteResponse, RouteStats, HealthResponse, ErrorResponse
@@ -93,14 +93,20 @@ class CrimeAwareRoutingService:
             start_coords = (request.start.latitude, request.start.longitude)
             end_coords = (request.destination.latitude, request.destination.longitude)
             
-            # Create routing configuration
-            config = RoutingConfig()
-            config.distance_weight = request.distance_weight
-            config.crime_weight = request.crime_weight
-            config.max_detour_ratio = request.max_detour_factor
+            # Create routing configuration using optimized safety settings
+            # This fixes the algorithm timing issue where routes were too similar to shortest path
+            config = RoutingConfig.create_optimized_safety_config()
             
-            # Initialize route optimizer
-            optimizer = RouteOptimizer(self.crime_data_path, config)
+            # Override with request parameters if provided
+            if hasattr(request, 'distance_weight') and request.distance_weight is not None:
+                config.distance_weight = request.distance_weight
+            if hasattr(request, 'crime_weight') and request.crime_weight is not None:
+                config.crime_weight = request.crime_weight
+            if hasattr(request, 'max_detour_factor') and request.max_detour_factor is not None:
+                config.max_detour_ratio = request.max_detour_factor
+            
+            # Initialize cached route optimizer
+            optimizer = CachedRouteOptimizer(self.crime_data_path, config)
             
             # Determine algorithms to use based on route type
             algorithms = self._get_algorithms_for_route_type(request.route_type)
@@ -141,12 +147,39 @@ class CrimeAwareRoutingService:
         try:
             routes = result.get('routes', {})
             
-            # Get the primary route based on request type
+            # Get the primary route based on request type and crime weighting
             primary_route = None
             if request.route_type == "shortest":
                 primary_route = routes.get('shortest_path')
-            else:
+            elif request.route_type == "safest":
                 primary_route = routes.get('weighted_astar', routes.get('shortest_path'))
+            else:  # crime_aware - choose route based on crime weighting
+                # If crime weight is very low (< 0.1), prefer shortest path
+                # If crime weight is high (> 0.7), prefer weighted route
+                # For intermediate values, compare routes and choose better option
+                if request.crime_weight < 0.1:
+                    primary_route = routes.get('shortest_path', routes.get('weighted_astar'))
+                elif request.crime_weight > 0.7:
+                    primary_route = routes.get('weighted_astar', routes.get('shortest_path'))
+                else:
+                    # For intermediate weights, choose the route that provides better value
+                    weighted_route = routes.get('weighted_astar')
+                    shortest_route = routes.get('shortest_path')
+                    
+                    if weighted_route and shortest_route:
+                        # Calculate efficiency: safety improvement per unit detour
+                        detour_ratio = weighted_route.total_distance / shortest_route.total_distance
+                        
+                        # If detour is reasonable for the crime weight, use weighted route
+                        # Otherwise fall back to shortest
+                        max_acceptable_detour = 1.0 + (request.crime_weight * 2.0)  # 1.0 to 3.0 range
+                        
+                        if detour_ratio <= max_acceptable_detour:
+                            primary_route = weighted_route
+                        else:
+                            primary_route = shortest_route
+                    else:
+                        primary_route = weighted_route or shortest_route
             
             if not primary_route:
                 return RouteResponse(

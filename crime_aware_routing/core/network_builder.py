@@ -3,7 +3,8 @@ Clean network builder for obtaining street networks efficiently.
 """
 
 import osmnx as ox
-from typing import Tuple, Optional
+import networkx as nx
+from typing import Tuple
 from .distance_utils import haversine_distance
 
 def build_network(start_coords: Tuple[float, float], 
@@ -54,7 +55,7 @@ def build_network(start_coords: Tuple[float, float],
 def find_nearest_nodes(graph, start_coords: Tuple[float, float], 
                       end_coords: Tuple[float, float]) -> Tuple[int, int]:
     """
-    Find the nearest network nodes to the start and end coordinates.
+    Find nearest nodes in the graph for start and end coordinates.
     
     Args:
         graph: NetworkX graph
@@ -65,8 +66,13 @@ def find_nearest_nodes(graph, start_coords: Tuple[float, float],
         Tuple of (start_node_id, end_node_id)
     """
     try:
+        # Use OSMnx to find nearest nodes (reverted to original reliable method)
         start_node = ox.nearest_nodes(graph, start_coords[1], start_coords[0])
         end_node = ox.nearest_nodes(graph, end_coords[1], end_coords[0])
         return start_node, end_node
+        
     except Exception as e:
-        raise RuntimeError(f"Failed to find nearest nodes: {e}") 
+        raise RuntimeError(f"Failed to find nearest nodes: {e}")
+
+# Virtual node functionality temporarily removed due to connectivity issues
+# Will be re-implemented with proper testing in future versions 

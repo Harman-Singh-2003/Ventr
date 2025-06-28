@@ -83,4 +83,60 @@ class RoutingConfig:
             crime_weight=0.1,
             kde_bandwidth=100.0,
             max_detour_ratio=1.2
+        )
+    
+    @classmethod
+    def create_optimized_safety_config(cls) -> 'RoutingConfig':
+        """
+        Create optimized safety configuration that fixes algorithm timing issues.
+        
+        Uses sharp crime boundaries (50m bandwidth) to enable early avoidance decisions
+        and realistic detour limits to allow proper safe route exploration.
+        """
+        return cls(
+            distance_weight=0.3,           # Lower distance priority
+            crime_weight=0.7,              # Higher crime avoidance
+            kde_bandwidth=50.0,            # Sharp boundaries for early decisions
+            crime_penalty_scale=2500.0,    # Higher penalties to justify detours
+            max_detour_ratio=2.5,          # Realistic limit for safe routes
+            adaptive_weighting=False,      # Disable distance bias for short edges
+            kde_resolution=25.0,           # Higher resolution for sharp boundaries
+            edge_sample_interval=15.0      # More frequent crime sampling
+        )
+    
+    @classmethod  
+    def create_ultra_safety_config(cls) -> 'RoutingConfig':
+        """
+        Create ultra-safety configuration for high-crime areas.
+        
+        Maximum crime avoidance with very sharp boundaries and high detour tolerance.
+        """
+        return cls(
+            distance_weight=0.2,           # Minimal distance priority
+            crime_weight=0.8,              # Maximum crime avoidance
+            kde_bandwidth=25.0,            # Very sharp boundaries
+            crime_penalty_scale=3500.0,    # Very high penalties
+            max_detour_ratio=3.0,          # High detour tolerance
+            adaptive_weighting=False,      # No distance bias
+            kde_resolution=15.0,           # Very high resolution
+            edge_sample_interval=10.0,     # Dense crime sampling
+            min_detour_threshold=50.0      # Apply crime weighting to very short edges
+        )
+    
+    @classmethod
+    def create_balanced_optimized_config(cls) -> 'RoutingConfig':
+        """
+        Create balanced configuration with optimized parameters.
+        
+        Good compromise between safety and efficiency using sharp boundaries.
+        """
+        return cls(
+            distance_weight=0.5,           # Balanced priorities
+            crime_weight=0.5,              # Balanced priorities
+            kde_bandwidth=75.0,            # Moderately sharp boundaries
+            crime_penalty_scale=2000.0,    # Moderate penalties
+            max_detour_ratio=2.0,          # Reasonable detour limit
+            adaptive_weighting=False,      # Disable problematic adaptive logic
+            kde_resolution=35.0,           # Good resolution
+            edge_sample_interval=20.0      # Regular sampling
         ) 
