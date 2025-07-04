@@ -185,7 +185,7 @@ async def get_api_info():
     """
     return {
         "api": "Crime-Aware Routing API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "description": "Calculate safer routes using Toronto crime data",
         "endpoints": {
             "POST /api/routing/calculate": "Calculate crime-aware route with custom parameters",

@@ -79,7 +79,7 @@ app = FastAPI(
     2. Calculate a route: `POST /api/routing/calculate`
     3. View results in GeoJSON format for mapping applications
     """,
-    version="1.0.0",
+    version="2.0.0",
     contact={
         "name": "Crime-Aware Routing API",
         "url": "https://github.com/your-repo/crime-aware-routing",
@@ -147,7 +147,7 @@ async def root():
     """
     return {
         "api": "Crime-Aware Routing API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "operational",
         "documentation": "/docs",
         "health_check": "/api/routing/health",
