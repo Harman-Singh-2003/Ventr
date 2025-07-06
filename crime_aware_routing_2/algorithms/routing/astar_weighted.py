@@ -251,6 +251,8 @@ class WeightedAStarRouter:
         
         for algorithm in algorithms:
             try:
+                algorithm_start_time = time.time()
+                
                 if algorithm == 'weighted_astar':
                     route = self.find_route(start_node, end_node, 'weighted_length')
                 elif algorithm == 'shortest_path':
@@ -261,6 +263,9 @@ class WeightedAStarRouter:
                 else:
                     logger.warning(f"Unknown algorithm: {algorithm}")
                     continue
+                
+                algorithm_time = time.time() - algorithm_start_time
+                logger.info(f"Algorithm {algorithm} completed in {algorithm_time:.3f}s")
                 
                 routes[algorithm] = route
                 

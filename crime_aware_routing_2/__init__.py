@@ -25,15 +25,13 @@ result = optimizer.find_safe_route(
 ## Main Components
 
 - **RouteOptimizer**: Main interface for route calculation
-- **CachedRouteOptimizer**: Performance-optimized version with caching
 - **RoutingConfig**: Configuration management
 - **RouteVisualizer**: Interactive map generation
-- **GridCache**: High-performance grid-based caching
 
 ## Architecture
 
 - `algorithms/`: Core routing and optimization algorithms
-- `mapping/`: Network building, caching, and graph enhancement
+- `mapping/`: Network building and graph enhancement
 - `data/`: Data loading and processing utilities
 - `visualization/`: Map generation and route visualization
 - `config/`: Configuration management
@@ -42,10 +40,9 @@ result = optimizer.find_safe_route(
 """
 
 # Main public API - expose the most commonly used classes
-from .algorithms import RouteOptimizer, CachedRouteOptimizer, WeightedAStarRouter
+from .algorithms import RouteOptimizer, WeightedAStarRouter
 from .config import RoutingConfig
 from .visualization import RouteVisualizer
-from .mapping import GridCache, CachedNetworkBuilder
 from .data import load_crime_data
 
 # Version information
@@ -56,13 +53,8 @@ __author__ = "Crime-Aware Routing Team"
 __all__ = [
     # Main interfaces
     'RouteOptimizer',
-    'CachedRouteOptimizer', 
     'RoutingConfig',
     'RouteVisualizer',
-    
-    # Performance components
-    'GridCache',
-    'CachedNetworkBuilder',
     
     # Core algorithms
     'WeightedAStarRouter',

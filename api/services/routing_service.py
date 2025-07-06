@@ -13,7 +13,7 @@ from shapely.geometry import LineString
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
-from crime_aware_routing_2.algorithms.optimization.cached_route_optimizer import CachedRouteOptimizer
+from crime_aware_routing_2.algorithms.optimization.route_optimizer import RouteOptimizer
 from crime_aware_routing_2.data.data_loader import load_crime_data
 from crime_aware_routing_2.config.routing_config import RoutingConfig
 from api.schemas.routing import RouteRequest, RouteResponse, RouteStats, HealthResponse, ErrorResponse
@@ -80,7 +80,11 @@ class CrimeAwareRoutingService:
         Returns:
             RouteResponse with route GeoJSON and statistics
         """
+        import time
+        
         try:
+            service_start_time = time.perf_counter()
+            
             if not self.is_initialized:
                 return RouteResponse(
                     success=False,
@@ -94,6 +98,8 @@ class CrimeAwareRoutingService:
             end_coords = (request.destination.latitude, request.destination.longitude)
             
             # Create routing configuration based on route type
+            config_start_time = time.perf_counter()
+            
             if request.route_type == "shortest":
                 # For shortest routes, use streamlined optimizer without crime weighting
                 config = RoutingConfig()
@@ -123,24 +129,42 @@ class CrimeAwareRoutingService:
             if hasattr(request, 'max_detour_factor') and request.max_detour_factor is not None:
                 config.max_detour_ratio = request.max_detour_factor
             
+            config_time = time.perf_counter() - config_start_time
+            logger.info(f"Configuration setup completed in {config_time:.3f}s")
+            
             # Initialize route optimizer based on route type
+            optimizer_start_time = time.perf_counter()
+            
             if request.route_type == "shortest":
                 # For shortest routes, use streamlined optimizer without crime weighting
-                optimizer = CachedRouteOptimizer(self.crime_data_path, config)
+                optimizer = RouteOptimizer(self.crime_data_path, config)
                 # Skip crime weighting by using algorithms that don't require it
                 algorithms = ["shortest_path"]
             else:
                 # For crime-aware routes, use full crime-aware optimizer
-                optimizer = CachedRouteOptimizer(self.crime_data_path, config)
+                optimizer = RouteOptimizer(self.crime_data_path, config)
                 algorithms = self._get_algorithms_for_route_type(request.route_type)
             
-            # Calculate routes
-            result = optimizer.find_safe_route(start_coords, end_coords, algorithms)
+            optimizer_time = time.perf_counter() - optimizer_start_time
+            logger.info(f"Optimizer initialization completed in {optimizer_time:.3f}s")
             
-            logger.info(f"Route calculation completed using {request.route_type} configuration with algorithms: {algorithms}")
+            # Calculate routes
+            route_calc_start_time = time.perf_counter()
+            result = optimizer.find_safe_route(start_coords, end_coords, algorithms)
+            route_calc_time = time.perf_counter() - route_calc_start_time
+            
+            logger.info(f"Route calculation completed using {request.route_type} configuration with algorithms: {algorithms} in {route_calc_time:.3f}s")
             
             # Convert result to API response format
-            return self._convert_to_response(result, request)
+            response_start_time = time.perf_counter()
+            response = self._convert_to_response(result, request)
+            response_time = time.perf_counter() - response_start_time
+            
+            total_service_time = time.perf_counter() - service_start_time
+            logger.info(f"Response conversion completed in {response_time:.3f}s")
+            logger.info(f"Total service calculation time: {total_service_time:.3f}s")
+            
+            return response
             
         except Exception as e:
             logger.error(f"Route calculation failed: {e}")
@@ -194,29 +218,12 @@ class CrimeAwareRoutingService:
             # Calculate route statistics
             route_stats = self._calculate_route_stats(primary_route)
             
-            # For comparison, always calculate shortest path stats when using weighted route
-            shortest_path_stats = None
-            if request.route_type != "shortest" and primary_route.algorithm != "shortest_path":
-                # Calculate shortest path for comparison
-                try:
-                    start_coords = (request.start.latitude, request.start.longitude)
-                    end_coords = (request.destination.latitude, request.destination.longitude)
-                    comparison_optimizer = CachedRouteOptimizer(self.crime_data_path, RoutingConfig())
-                    comparison_result = comparison_optimizer.find_safe_route(
-                        start_coords, end_coords, ["shortest_path"]
-                    )
-                    shortest_route = comparison_result.get('routes', {}).get('shortest_path')
-                    if shortest_route:
-                        shortest_path_stats = self._calculate_route_stats(shortest_route)
-                except Exception as e:
-                    logger.debug(f"Could not calculate shortest path for comparison: {e}")
-            
             return RouteResponse(
                 success=True,
                 message="Route calculated successfully",
                 route_geojson=route_geojson,
                 route_stats=route_stats,
-                shortest_path_stats=shortest_path_stats
+                shortest_path_stats=None
             )
             
         except Exception as e:

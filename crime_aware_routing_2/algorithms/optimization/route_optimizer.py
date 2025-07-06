@@ -62,29 +62,50 @@ class RouteOptimizer:
         Returns:
             Dictionary with routes, crime surface, and metrics
         """
+        import time
+        
         if algorithms is None:
             algorithms = ['weighted_astar', 'shortest_path']
         
+        overall_start_time = time.perf_counter()
         logger.info(f"Finding safe route from {start_coords} to {end_coords}")
         
         try:
             # Step 1: Build street network
+            network_start_time = time.perf_counter()
             graph = self._build_network(start_coords, end_coords)
+            network_time = time.perf_counter() - network_start_time
+            logger.info(f"Network building completed in {network_time:.3f}s")
             
             # Step 2: Process crime data for the area
+            crime_prep_start_time = time.perf_counter()
             self._prepare_crime_weighting(start_coords, end_coords)
+            crime_prep_time = time.perf_counter() - crime_prep_start_time
+            logger.info(f"Crime weighting preparation completed in {crime_prep_time:.3f}s")
             
             # Step 3: Enhance graph with crime weights
+            enhance_start_time = time.perf_counter()
             enhanced_graph = self._enhance_graph(graph)
+            enhance_time = time.perf_counter() - enhance_start_time
+            logger.info(f"Graph enhancement completed in {enhance_time:.3f}s")
             
             # Step 4: Find nearest nodes to coordinates
+            nodes_start_time = time.perf_counter()
             start_node, end_node = find_nearest_nodes(enhanced_graph, start_coords, end_coords)
+            nodes_time = time.perf_counter() - nodes_start_time
+            logger.info(f"Nearest node finding completed in {nodes_time:.3f}s")
             
             # Step 5: Calculate routes using different algorithms
+            routes_start_time = time.perf_counter()
             routes = self._calculate_routes(enhanced_graph, start_node, end_node, algorithms)
+            routes_time = time.perf_counter() - routes_start_time
+            logger.info(f"Route algorithms calculation completed in {routes_time:.3f}s")
             
             # Step 6: Generate analysis and metrics
+            analysis_start_time = time.perf_counter()
             analysis = self._analyze_routes(routes, start_coords, end_coords)
+            analysis_time = time.perf_counter() - analysis_start_time
+            logger.info(f"Route analysis completed in {analysis_time:.3f}s")
             
             result = {
                 'routes': routes,
@@ -99,11 +120,22 @@ class RouteOptimizer:
                         'nodes': len(enhanced_graph.nodes),
                         'edges': len(enhanced_graph.edges)
                     },
-                    'config': self.config.__dict__
+                    'config': self.config.__dict__,
+                    'timing': {
+                        'network_build': network_time,
+                        'crime_prep': crime_prep_time,
+                        'graph_enhance': enhance_time,
+                        'node_finding': nodes_time,
+                        'route_calc': routes_time,
+                        'analysis': analysis_time
+                    }
                 }
             }
             
-            logger.info(f"Route optimization completed successfully")
+            overall_time = time.perf_counter() - overall_start_time
+            logger.info(f"Route optimization completed successfully in {overall_time:.3f}s")
+            logger.info(f"Timing breakdown: network={network_time:.3f}s, crime_prep={crime_prep_time:.3f}s, "
+                       f"enhance={enhance_time:.3f}s, nodes={nodes_time:.3f}s, routes={routes_time:.3f}s, analysis={analysis_time:.3f}s")
             return result
             
         except Exception as e:
@@ -186,18 +218,29 @@ class RouteOptimizer:
     def _calculate_routes(self, graph: nx.MultiDiGraph, start_node: int, end_node: int,
                          algorithms: List[str]) -> Dict[str, RouteDetails]:
         """Calculate routes using specified algorithms."""
+        import time
+        
         logger.info(f"Calculating routes using algorithms: {algorithms}")
         
         # Initialize router
+        router_init_start = time.perf_counter()
         self.router = WeightedAStarRouter(graph, self.config)
+        router_init_time = time.perf_counter() - router_init_start
+        logger.info(f"Router initialization completed in {router_init_time:.3f}s")
         
         # Calculate routes
+        routes_calc_start = time.perf_counter()
         routes = self.router.find_multiple_routes(start_node, end_node, algorithms)
+        routes_calc_time = time.perf_counter() - routes_calc_start
+        logger.info(f"Multiple routes calculation completed in {routes_calc_time:.3f}s")
         
         # Validate routes
+        validation_start = time.perf_counter()
         for algorithm, route in routes.items():
             if not self.router.validate_route(route):
                 logger.warning(f"Route validation failed for {algorithm}")
+        validation_time = time.perf_counter() - validation_start
+        logger.info(f"Route validation completed in {validation_time:.3f}s")
         
         return routes
     

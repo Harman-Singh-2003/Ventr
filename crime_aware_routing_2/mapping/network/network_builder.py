@@ -21,7 +21,12 @@ def build_network(start_coords: Tuple[float, float],
     Returns:
         NetworkX MultiDiGraph with street network
     """
+    import time
+    
+    network_start_time = time.perf_counter()
+    
     # Calculate center point and network radius
+    calc_start = time.perf_counter()
     center_lat = (start_coords[0] + end_coords[0]) / 2
     center_lon = (start_coords[1] + end_coords[1]) / 2
     
@@ -33,20 +38,27 @@ def build_network(start_coords: Tuple[float, float],
     
     # Network radius: at least 800m, or 80% of route distance (learned optimal)
     network_radius = max(800, route_distance * buffer_factor)
+    calc_time = time.perf_counter() - calc_start
     
     print(f"Building network around ({center_lat:.4f}, {center_lon:.4f})")
     print(f"Route distance: {route_distance:.0f}m, Network radius: {network_radius:.0f}m")
+    print(f"Network parameters calculated in {calc_time:.3f}s")
     
     try:
         # Load street network with walking configuration
+        download_start = time.perf_counter()
         G = ox.graph_from_point(
             (center_lat, center_lon),
             dist=network_radius,
             network_type='walk',  # Optimized for pedestrian routing
             simplify=True         # Simplify for better performance
         )
+        download_time = time.perf_counter() - download_start
+        total_time = time.perf_counter() - network_start_time
         
         print(f"✓ Network loaded: {len(G.nodes)} nodes, {len(G.edges)} edges")
+        print(f"Network download completed in {download_time:.3f}s")
+        print(f"Total network building completed in {total_time:.3f}s")
         return G
         
     except Exception as e:
@@ -65,10 +77,16 @@ def find_nearest_nodes(graph, start_coords: Tuple[float, float],
     Returns:
         Tuple of (start_node_id, end_node_id)
     """
+    import time
+    
     try:
         # Use OSMnx to find nearest nodes (reverted to original reliable method)
+        nearest_start = time.perf_counter()
         start_node = ox.nearest_nodes(graph, start_coords[1], start_coords[0])
         end_node = ox.nearest_nodes(graph, end_coords[1], end_coords[0])
+        nearest_time = time.perf_counter() - nearest_start
+        
+        print(f"Nearest nodes found in {nearest_time:.3f}s (start: {start_node}, end: {end_node})")
         return start_node, end_node
         
     except Exception as e:

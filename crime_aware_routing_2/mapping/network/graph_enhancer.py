@@ -45,6 +45,10 @@ class GraphEnhancer:
         Returns:
             Enhanced graph with 'weighted_length' edge attributes
         """
+        import time
+        
+        enhancement_start_time = time.perf_counter()
+        
         if distance_weight is None:
             distance_weight = self.config.distance_weight
         if crime_weight is None:
@@ -58,13 +62,20 @@ class GraphEnhancer:
                    f"(distance_weight={distance_weight:.2f}, crime_weight={crime_weight:.2f})")
         
         # Ensure crime weighter is fitted
+        weighter_validation_start = time.perf_counter()
         self.crime_weighter.validate_fitted()
+        weighter_validation_time = time.perf_counter() - weighter_validation_start
+        logger.info(f"Weighter validation completed in {weighter_validation_time:.3f}s")
         
         # Get distance statistics for normalization
+        normalization_start = time.perf_counter()
         distances = [data.get('length', 0) for _, _, data in graph.edges(data=True)]
         max_distance = max(distances) if distances else 1.0
+        normalization_time = time.perf_counter() - normalization_start
+        logger.info(f"Distance normalization completed in {normalization_time:.3f}s")
         
         # Process each edge
+        processing_start = time.perf_counter()
         edges_processed = 0
         for u, v, key, data in graph.edges(keys=True, data=True):
             try:
@@ -114,7 +125,12 @@ class GraphEnhancer:
                 # Fallback to original length
                 data['weighted_length'] = data.get('length', 1.0)
         
+        processing_time = time.perf_counter() - processing_start
+        total_enhancement_time = time.perf_counter() - enhancement_start_time
+        
         logger.info(f"Successfully enhanced {edges_processed} edges with crime weights")
+        logger.info(f"Edge processing completed in {processing_time:.3f}s")
+        logger.info(f"Total graph enhancement completed in {total_enhancement_time:.3f}s")
         return graph
     
     def _get_edge_geometry(self, graph: nx.MultiDiGraph, u: int, v: int, 

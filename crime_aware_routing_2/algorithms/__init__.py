@@ -9,15 +9,11 @@ This module contains:
 
 from .routing.astar_weighted import WeightedAStarRouter, RouteDetails
 from .optimization.route_optimizer import RouteOptimizer
-from .optimization.cached_route_optimizer import CachedRouteOptimizer
-from .crime_weighting.kde_weighter import KDECrimeWeighter
 from .crime_weighting.base_weighter import BaseCrimeWeighter
 
 __all__ = [
     'WeightedAStarRouter',
     'RouteDetails',
     'RouteOptimizer',
-    'CachedRouteOptimizer', 
-    'KDECrimeWeighter',
     'BaseCrimeWeighter'
 ] 

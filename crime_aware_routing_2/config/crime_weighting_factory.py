@@ -9,12 +9,11 @@ from typing import Optional, Dict, Any
 from enum import Enum
 
 from .routing_config import RoutingConfig
-from ..algorithms.crime_weighting import BaseCrimeWeighter, KDECrimeWeighter, NetworkProximityWeighter
+from ..algorithms.crime_weighting import BaseCrimeWeighter, NetworkProximityWeighter
 
 
 class CrimeWeightingMethod(Enum):
     """Available crime weighting methods."""
-    KDE = "kde"
     NETWORK_PROXIMITY = "network_proximity"
 
 
@@ -47,23 +46,11 @@ class CrimeWeightingFactory:
         if config is None:
             config = RoutingConfig()
             
-        if method == CrimeWeightingMethod.KDE:
-            return CrimeWeightingFactory._create_kde_weighter(config, **kwargs)
-        
-        elif method == CrimeWeightingMethod.NETWORK_PROXIMITY:
+        if method == CrimeWeightingMethod.NETWORK_PROXIMITY:
             return CrimeWeightingFactory._create_network_proximity_weighter(config, **kwargs)
         
         else:
             raise ValueError(f"Unsupported crime weighting method: {method}")
-    
-    @staticmethod
-    def _create_kde_weighter(config: RoutingConfig, **kwargs) -> KDECrimeWeighter:
-        """Create KDE crime weighter with configuration."""
-        return KDECrimeWeighter(
-            config=config,
-            bandwidth=kwargs.get('bandwidth', config.kde_bandwidth),
-            kernel=kwargs.get('kernel', config.kde_kernel)
-        )
     
     @staticmethod
     def _create_network_proximity_weighter(config: RoutingConfig, **kwargs) -> NetworkProximityWeighter:
@@ -84,7 +71,6 @@ class CrimeWeightingFactory:
             Dictionary mapping method names to descriptions
         """
         return {
-            CrimeWeightingMethod.KDE.value: "Kernel Density Estimation - smooth grid-based crime surfaces",
             CrimeWeightingMethod.NETWORK_PROXIMITY.value: "Network Proximity - direct edge scoring without grids"
         }
     
@@ -99,23 +85,7 @@ class CrimeWeightingFactory:
         Returns:
             Dictionary of parameter names with their descriptions and defaults
         """
-        if method == CrimeWeightingMethod.KDE:
-            return {
-                'bandwidth': {
-                    'description': 'KDE bandwidth in meters (influence radius)',
-                    'type': float,
-                    'default': 200.0,
-                    'range': (50.0, 1000.0)
-                },
-                'kernel': {
-                    'description': 'Kernel type for density estimation',
-                    'type': str,
-                    'default': 'gaussian',
-                    'options': ['gaussian', 'tophat', 'epanechnikov']
-                }
-            }
-        
-        elif method == CrimeWeightingMethod.NETWORK_PROXIMITY:
+        if method == CrimeWeightingMethod.NETWORK_PROXIMITY:
             return {
                 'influence_radius': {
                     'description': 'Crime influence radius in meters',
@@ -143,14 +113,7 @@ class CrimeWeightingFactory:
 
 # Convenience functions for common use cases
 
-def create_kde_weighter(config: Optional[RoutingConfig] = None, **kwargs) -> KDECrimeWeighter:
-    """Convenience function to create KDE weighter."""
-    return CrimeWeightingFactory.create_weighter(
-        CrimeWeightingMethod.KDE, config, **kwargs
-    )
-
-
-def create_network_proximity_weighter(config: Optional[RoutingConfig] = None, **kwargs) -> NetworkProximityWeighter:
+def create_network_proximity_weighter(config: Optional[RoutingConfig] = None, **kwargs) -> BaseCrimeWeighter:
     """Convenience function to create Network Proximity weighter."""
     return CrimeWeightingFactory.create_weighter(
         CrimeWeightingMethod.NETWORK_PROXIMITY, config, **kwargs
@@ -164,7 +127,7 @@ def create_weighter_from_string(method_name: str,
     Create weighter from string name.
     
     Args:
-        method_name: Name of the method ('kde' or 'network_proximity')
+        method_name: Name of the method (only 'network_proximity' is supported)
         config: Routing configuration
         **kwargs: Method-specific parameters
         
@@ -181,7 +144,7 @@ def create_weighter_from_string(method_name: str,
 
 # Configuration presets for common scenarios
 
-def get_consistent_weighter(config: Optional[RoutingConfig] = None) -> NetworkProximityWeighter:
+def get_consistent_weighter(config: Optional[RoutingConfig] = None) -> BaseCrimeWeighter:
     """
     Get a weighter optimized for consistent results.
     
@@ -194,24 +157,11 @@ def get_consistent_weighter(config: Optional[RoutingConfig] = None) -> NetworkPr
     )
 
 
-def get_smooth_weighter(config: Optional[RoutingConfig] = None) -> KDECrimeWeighter:
+def get_fast_weighter(config: Optional[RoutingConfig] = None) -> BaseCrimeWeighter:
     """
-    Get a weighter optimized for smooth crime surfaces.
+    Get a weighter optimized for fast performance.
     
-    Recommended for visualization and research applications.
-    """
-    return create_kde_weighter(
-        config=config,
-        bandwidth=200.0,
-        kernel='gaussian'
-    )
-
-
-def get_fast_weighter(config: Optional[RoutingConfig] = None) -> NetworkProximityWeighter:
-    """
-    Get a weighter optimized for speed.
-    
-    Recommended for real-time applications.
+    Recommended for real-time applications where speed is critical.
     """
     return create_network_proximity_weighter(
         config=config,

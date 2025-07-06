@@ -72,13 +72,19 @@ async def calculate_route(request: RouteRequest):
         }
         ```
     """
+    import time
+    
     try:
+        start_time = time.perf_counter()
         logger.info(f"Route calculation request: {request.route_type} from "
                    f"({request.start.latitude}, {request.start.longitude}) to "
                    f"({request.destination.latitude}, {request.destination.longitude})")
         
         # Calculate the route
         response = routing_service.calculate_route(request)
+        
+        total_time = time.perf_counter() - start_time
+        logger.info(f"Total API route calculation completed in {total_time:.3f}s")
         
         # Return appropriate HTTP status based on success
         if response.success:

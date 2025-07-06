@@ -9,7 +9,7 @@ from pathlib import Path
 import folium
 import numpy as np
 from ..algorithms.routing.astar_weighted import RouteDetails
-from ..algorithms.crime_weighting.kde_weighter import CrimeSurface
+# Crime surface visualization is no longer supported after KDE removal
 from ..config.routing_config import RoutingConfig
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,6 @@ class RouteVisualizer:
         self.config = config or RoutingConfig()
         
     def create_comparison_map(self, routes: Dict[str, RouteDetails],
-                            crime_surface: Optional[CrimeSurface] = None,
                             crime_points: Optional[np.ndarray] = None,
                             center_coords: Optional[Tuple[float, float]] = None,
                             route_colors: Optional[Dict[str, str]] = None) -> folium.Map:
@@ -39,7 +38,6 @@ class RouteVisualizer:
         
         Args:
             routes: Dictionary mapping algorithm names to RouteDetails
-            crime_surface: KDE crime surface for heatmap overlay
             crime_points: Raw crime point data for markers
             center_coords: Map center coordinates (lat, lon)
             route_colors: Optional dictionary mapping route names to colors
@@ -61,9 +59,7 @@ class RouteVisualizer:
             tiles=self.config.map_style
         )
         
-        # Add crime heatmap if available
-        if crime_surface is not None:
-            self._add_crime_heatmap(m, crime_surface)
+        # Crime heatmap functionality removed with KDE weighter
         
         # Add crime points if available
         if crime_points is not None and len(crime_points) > 0:
@@ -98,47 +94,7 @@ class RouteVisualizer:
         
         return (float(np.mean(lats)), float(np.mean(lons)))
     
-    def _add_crime_heatmap(self, m: folium.Map, crime_surface: CrimeSurface) -> None:
-        """Add crime density heatmap overlay to map."""
-        try:
-            # Create heatmap data from crime surface
-            heat_data = []
-            
-            # Sample the crime surface at regular intervals
-            lat_step = max(1, len(crime_surface.lat_grid) // 50)  # Limit to ~50 points per dimension
-            lon_step = max(1, len(crime_surface.lon_grid) // 50)
-            
-            for i in range(0, len(crime_surface.lat_grid), lat_step):
-                for j in range(0, len(crime_surface.lon_grid), lon_step):
-                    lat = crime_surface.lat_grid[i]
-                    lon = crime_surface.lon_grid[j]
-                    density = crime_surface.density_values[i, j]
-                    
-                    if density > 0.1:  # Only include significant density values
-                        heat_data.append([lat, lon, density])
-            
-            if heat_data:
-                # Add heatmap layer
-                from folium.plugins import HeatMap
-                HeatMap(
-                    heat_data,
-                    name='Crime Density',
-                    radius=15,
-                    blur=20,
-                    max_zoom=1,
-                    gradient={
-                        0.0: 'blue',
-                        0.3: 'lime', 
-                        0.5: 'yellow',
-                        0.7: 'orange',
-                        1.0: 'red'
-                    }
-                ).add_to(m)
-                
-                logger.debug(f"Added crime heatmap with {len(heat_data)} points")
-            
-        except Exception as e:
-            logger.warning(f"Failed to add crime heatmap: {e}")
+    # Crime heatmap functionality removed with KDE weighter
     
     def _add_crime_points(self, m: folium.Map, crime_points: np.ndarray, 
                          max_points: int = 500) -> None:
