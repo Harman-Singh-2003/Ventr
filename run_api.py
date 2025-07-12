@@ -2,13 +2,29 @@
 """
 Startup script for the Crime-Aware Routing API server.
 
-This script starts the FastAPI server with proper configuration.
+This script starts the FastAPI server with proper configuration and
+ensures the network cache is available for optimal performance.
 """
 
 import os
 import sys
 import uvicorn
 import argparse
+import logging
+from pathlib import Path
+
+# Add the project root to the path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
+
+from crime_aware_routing_2.mapping.network.network_cache import ensure_toronto_cache
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def main():
     """Start the FastAPI server."""
@@ -18,6 +34,8 @@ def main():
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
     parser.add_argument("--log-level", default="info", choices=["debug", "info", "warning", "error"], 
                        help="Log level")
+    parser.add_argument("--skip-cache", action="store_true", 
+                       help="Skip network cache initialization (faster startup for development)")
     
     args = parser.parse_args()
     
@@ -29,6 +47,23 @@ def main():
     
     # Ensure we're in the right directory
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    
+    # Initialize network cache if not skipped
+    if not args.skip_cache:
+        print("🗺️  Initializing network cache...")
+        try:
+            cache_ready = ensure_toronto_cache()
+            if cache_ready:
+                print("✅ Network cache ready - routes will use cached data for better performance")
+            else:
+                print("⚠️  Network cache initialization failed - routes will use direct downloads")
+        except Exception as e:
+            print(f"⚠️  Network cache error: {e}")
+            print("   Routes will still work but may be slower")
+    else:
+        print("⏭️  Skipping network cache initialization")
+    
+    print("-" * 50)
     
     # Start the server
     uvicorn.run(

@@ -69,6 +69,8 @@ class HealthResponse(BaseModel):
     version: str = Field(..., description="API version")
     crime_data_loaded: bool = Field(..., description="Whether crime data is loaded")
     crime_incidents_count: int = Field(..., description="Number of crime incidents loaded")
+    network_cache_available: bool = Field(..., description="Whether network cache is available")
+    cache_coverage_km: float = Field(..., description="Network cache coverage radius in kilometers")
 
 
 class ErrorResponse(BaseModel):

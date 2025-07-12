@@ -15,7 +15,7 @@ def create_lightweight_visualization(output_file="network_comparison_lite.html")
     lat, lon = 43.6532, -79.3832
     radius_m = 3000
     large_radius_m = 10000
-    cache_file = "osmnx_cache/toronto_large.pkl"
+    cache_file = "../osmnx_cache/toronto_network.pkl"
     
     print("=== Creating Lightweight Visualization ===")
     
@@ -27,7 +27,17 @@ def create_lightweight_visualization(output_file="network_comparison_lite.html")
     # Load cached graph
     print("Loading cached graph...")
     with open(cache_file, 'rb') as f:
-        G_large = pickle.load(f)
+        cache_data = pickle.load(f)
+    
+    # Handle both old and new cache formats
+    if isinstance(cache_data, dict) and 'graph' in cache_data:
+        # New cache format with metadata
+        G_large = cache_data['graph']
+        print(f"Loaded new format cache: {cache_data.get('radius', 'unknown')/1000:.1f}km radius")
+    else:
+        # Old cache format (direct graph)
+        G_large = cache_data
+        print("Loaded old format cache")
     
     # Extract from cache
     print("Extracting from cache...")

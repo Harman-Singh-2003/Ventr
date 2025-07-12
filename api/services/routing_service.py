@@ -16,6 +16,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 from crime_aware_routing_2.algorithms.optimization.route_optimizer import RouteOptimizer
 from crime_aware_routing_2.data.data_loader import load_crime_data
 from crime_aware_routing_2.config.routing_config import RoutingConfig
+from crime_aware_routing_2.mapping.network.network_cache import get_network_cache
 from api.schemas.routing import RouteRequest, RouteResponse, RouteStats, HealthResponse, ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -63,11 +64,17 @@ class CrimeAwareRoutingService:
     
     def get_health_status(self) -> HealthResponse:
         """Get the health status of the routing service."""
+        # Check network cache status
+        cache = get_network_cache()
+        cache_info = cache.get_cache_info()
+        
         return HealthResponse(
             status="healthy" if self.is_initialized else "degraded",
             version="2.0.0",  # Updated to reflect refactored codebase
             crime_data_loaded=self.is_initialized,
-            crime_incidents_count=len(self.crime_data) if self.crime_data else 0
+            crime_incidents_count=len(self.crime_data) if self.crime_data else 0,
+            network_cache_available=cache_info.get('available', False),
+            cache_coverage_km=cache_info.get('radius_km', 0) if cache_info.get('available') else 0
         )
     
     def calculate_route(self, request: RouteRequest) -> RouteResponse:
