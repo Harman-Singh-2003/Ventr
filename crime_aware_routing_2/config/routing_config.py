@@ -22,7 +22,7 @@ class RoutingConfig:
     # Weight Balancing
     distance_weight: float = 0.7  # importance of route distance (0-1)
     crime_weight: float = 0.3     # importance of crime avoidance (0-1)
-    adaptive_weighting: bool = True  # dynamically adjust weights based on context
+    adaptive_weighting: bool = False  # dynamically adjust weights based on context (disabled by default for smooth behavior)
     min_detour_threshold: float = 200.0  # meters - min route length to apply crime weighting
     
     # Performance Optimization

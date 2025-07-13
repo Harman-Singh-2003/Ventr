@@ -11,7 +11,9 @@ from api.schemas.routing import (
     RouteResponse, 
     HealthResponse,
     LocationRequest,
-    ErrorResponse
+    ErrorResponse,
+    MultipleRouteRequest,
+    MultipleRouteResponse
 )
 from api.services.routing_service import routing_service
 
@@ -110,6 +112,71 @@ async def calculate_route(request: RouteRequest):
         )
 
 
+@router.post("/calculate-multiple", response_model=MultipleRouteResponse, summary="Calculate Both Shortest and Safest Routes")
+async def calculate_multiple_routes(request: MultipleRouteRequest):
+    """
+    Calculate both shortest and safest routes in a single optimized operation.
+    
+    This endpoint efficiently calculates multiple route types simultaneously,
+    avoiding the overhead of extracting the subgraph and processing crime data
+    multiple times. This is significantly faster than calling separate endpoints.
+    
+    Args:
+        request: MultipleRouteRequest specifying which routes to calculate
+        
+    Returns:
+        MultipleRouteResponse: Both routes with comparison statistics
+        
+    Example:
+        ```json
+        {
+            "start": {
+                "latitude": 43.6426,
+                "longitude": -79.3871
+            },
+            "destination": {
+                "latitude": 43.6452,
+                "longitude": -79.3806
+            },
+            "include_shortest": true,
+            "include_safest": true,
+            "crime_weight_safest": 0.7,
+            "max_detour_factor": 2.0
+        }
+        ```
+    """
+    import time
+    
+    try:
+        start_time = time.perf_counter()
+        logger.info(f"Multiple route calculation request from "
+                   f"({request.start.latitude}, {request.start.longitude}) to "
+                   f"({request.destination.latitude}, {request.destination.longitude})")
+        
+        # Calculate multiple routes
+        response = routing_service.calculate_multiple_routes(request)
+        
+        total_time = time.perf_counter() - start_time
+        logger.info(f"Total API multiple route calculation completed in {total_time:.3f}s")
+        
+        return response
+            
+    except ValueError as e:
+        # Validation errors
+        logger.warning(f"Multiple route calculation validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Unexpected errors
+        logger.error(f"Multiple route calculation failed with unexpected error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during multiple route calculation"
+        )
+
+
 @router.post("/shortest", response_model=RouteResponse, summary="Calculate Shortest Route")
 async def calculate_shortest_route(start: LocationRequest, destination: LocationRequest):
     """
@@ -195,6 +262,7 @@ async def get_api_info():
         "description": "Calculate safer routes using Toronto crime data",
         "endpoints": {
             "POST /api/routing/calculate": "Calculate crime-aware route with custom parameters",
+            "POST /api/routing/calculate-multiple": "Calculate both shortest and safest routes efficiently in one operation",
             "POST /api/routing/shortest": "Calculate shortest route only",
             "POST /api/routing/safest": "Calculate safest route (prioritizes crime avoidance)",
             "GET /api/routing/health": "Check service health status",
@@ -207,4 +275,4 @@ async def get_api_info():
             "latitude": {"min": 43.0, "max": 44.5},
             "longitude": {"min": -80.5, "max": -78.5}
         }
-    } 
+    }

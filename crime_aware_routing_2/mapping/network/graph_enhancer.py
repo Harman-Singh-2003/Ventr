@@ -195,7 +195,7 @@ class GraphEnhancer:
     def _calculate_adaptive_weights(self, edge_distance: float, crime_score: float,
                                   base_distance_weight: float, base_crime_weight: float) -> Tuple[float, float]:
         """
-        Calculate adaptive weights based on edge characteristics.
+        Calculate adaptive weights based on edge characteristics using smooth transitions.
         
         Args:
             edge_distance: Length of edge in meters
@@ -206,20 +206,35 @@ class GraphEnhancer:
         Returns:
             Tuple of (adaptive_distance_weight, adaptive_crime_weight)
         """
-        # Very short edges: prioritize distance over crime
+        # Very short edges: gradually prioritize distance over crime (smooth transition)
         if edge_distance < self.config.min_detour_threshold:
-            return 0.9, 0.1
+            # Smooth scaling based on edge length (0 to min_detour_threshold)
+            length_factor = edge_distance / self.config.min_detour_threshold
+            distance_boost = 0.1 * (1.0 - length_factor)  # Max 0.1 boost for very short edges
+            
+            adaptive_distance_weight = min(base_distance_weight + distance_boost, 1.0)
+            adaptive_crime_weight = max(base_crime_weight - distance_boost, 0.0)
+            return adaptive_distance_weight, adaptive_crime_weight
         
-        # Low crime areas: prioritize distance
-        if crime_score < 0.1:
-            return min(base_distance_weight + 0.2, 1.0), max(base_crime_weight - 0.2, 0.0)
+        # Smooth crime-based adjustment (replaces hard thresholds)
+        # Use sigmoid-like smooth transitions instead of hard jumps
         
-        # High crime areas: prioritize safety
-        if crime_score > 0.7:
-            return max(base_distance_weight - 0.2, 0.0), min(base_crime_weight + 0.2, 1.0)
+        # For low crime areas (0.0 to 0.2): gradually favor distance
+        if crime_score <= 0.2:
+            # Smooth transition from 0.1 boost at score=0 to 0 boost at score=0.2
+            distance_boost = 0.1 * (0.2 - crime_score) / 0.2
+        # For high crime areas (0.6 to 1.0): gradually favor safety  
+        elif crime_score >= 0.6:
+            # Smooth transition from 0 boost at score=0.6 to 0.1 boost at score=1.0
+            distance_boost = -0.1 * (crime_score - 0.6) / 0.4  # Negative = reduce distance weight
+        else:
+            # Normal range (0.2 to 0.6): no adjustment
+            distance_boost = 0.0
         
-        # Normal case: use base weights
-        return base_distance_weight, base_crime_weight
+        adaptive_distance_weight = max(0.0, min(1.0, base_distance_weight + distance_boost))
+        adaptive_crime_weight = max(0.0, min(1.0, base_crime_weight - distance_boost))
+        
+        return adaptive_distance_weight, adaptive_crime_weight
     
     def get_enhancement_statistics(self, graph: nx.MultiDiGraph) -> Dict[str, Any]:
         """

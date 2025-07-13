@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*/__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+
+# OSMnx cache files
+osmnx_cache/
+osmnx-cache*/
+*.pkl
+
+# Project cache and output
+cache/
+output/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+temp/
+
+# Keep important files
+!index.html
+!network_comparison*.html
