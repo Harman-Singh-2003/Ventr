@@ -51,6 +51,10 @@ async def calculate_route(request: RouteRequest):
     safer navigation options. You can specify the balance between route distance
     and crime avoidance.
     
+    The endpoint automatically uses the enhanced graph cache when available for
+    crime_weight=0.1, providing significant performance improvements for routes
+    within the Toronto area coverage.
+    
     Args:
         request: RouteRequest containing start/end locations and preferences
         
@@ -70,7 +74,8 @@ async def calculate_route(request: RouteRequest):
             },
             "route_type": "crime_aware",
             "distance_weight": 0.7,
-            "crime_weight": 0.3
+            "crime_weight": 0.3,
+            "use_enhanced_cache": true
         }
         ```
     """
@@ -121,6 +126,10 @@ async def calculate_multiple_routes(request: MultipleRouteRequest):
     avoiding the overhead of extracting the subgraph and processing crime data
     multiple times. This is significantly faster than calling separate endpoints.
     
+    The endpoint automatically uses the enhanced graph cache when available for
+    crime_weight=0.1, providing significant performance improvements for routes
+    within the Toronto area coverage.
+    
     Args:
         request: MultipleRouteRequest specifying which routes to calculate
         
@@ -141,7 +150,8 @@ async def calculate_multiple_routes(request: MultipleRouteRequest):
             "include_shortest": true,
             "include_safest": true,
             "crime_weight_safest": 0.7,
-            "max_detour_factor": 2.0
+            "max_detour_factor": 2.0,
+            "use_enhanced_cache": true
         }
         ```
     """

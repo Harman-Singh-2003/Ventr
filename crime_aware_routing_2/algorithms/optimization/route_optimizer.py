@@ -3,12 +3,14 @@ Main route optimizer that coordinates crime data, graph enhancement, and routing
 """
 
 import logging
+import time
 from typing import Dict, Tuple, Optional, Any, List
 import networkx as nx
 import numpy as np
 from ...data.crime_processor import CrimeProcessor
 from ...mapping.network.graph_enhancer import GraphEnhancer
 from ...mapping.network.network_builder import build_network, find_nearest_nodes
+from ...mapping.network.enhanced_network_builder import build_enhanced_network
 from ..crime_weighting import BaseCrimeWeighter
 from ..routing.astar_weighted import WeightedAStarRouter, RouteDetails
 from ...config.routing_config import RoutingConfig
@@ -147,12 +149,40 @@ class RouteOptimizer:
         """Build street network for the route area."""
         logger.info("Building street network...")
         
-        # Use existing network builder with optimized parameters
+        # Use enhanced cache for crime_weight=0.1 when available
+        if (hasattr(self.config, 'crime_weight') and 
+            abs(self.config.crime_weight - 0.1) < 1e-6):  # Exact match for 0.1
+            
+            logger.info("Crime weight is 0.1 - using enhanced network builder for optimal performance")
+            try:
+                enhanced_start = time.perf_counter()
+                enhanced_graph = build_enhanced_network(start_coords, end_coords, crime_weight=0.1)
+                enhanced_time = time.perf_counter() - enhanced_start
+                
+                # Check if graph is already enhanced (has crime scores)
+                enhanced_edges = sum(1 for _, _, data in enhanced_graph.edges(data=True) 
+                                   if 'crime_score' in data)
+                
+                if enhanced_edges > 0:
+                    logger.info(f"✓ Using pre-enhanced network: {enhanced_edges} edges already enhanced in {enhanced_time:.3f}s")
+                    self.current_graph = enhanced_graph
+                    return enhanced_graph
+                else:
+                    logger.info(f"Enhanced network not available, falling back to standard method (took {enhanced_time:.3f}s)")
+            except Exception as e:
+                logger.warning(f"Enhanced network building failed: {e}, falling back to standard method")
+        
+        # Use standard network builder for other crime weights or when enhanced cache unavailable
+        logger.info("Using standard network builder")
+        standard_start = time.perf_counter()
         graph = build_network(
             start_coords, 
             end_coords,
             buffer_factor=self.config.max_network_radius / 1000.0  # Convert to km approximation
         )
+        standard_time = time.perf_counter() - standard_start
+        
+        logger.info(f"✓ Standard network built in {standard_time:.3f}s: {len(graph.nodes)} nodes, {len(graph.edges)} edges")
         
         self.current_graph = graph
         return graph
@@ -194,22 +224,32 @@ class RouteOptimizer:
     
     def _enhance_graph(self, graph: nx.MultiDiGraph) -> nx.MultiDiGraph:
         """Enhance graph with crime-based edge weights."""
+        
+        # Check if graph is already enhanced (EXACTLY as current implementation would check)
+        enhanced_edges = sum(1 for _, _, data in graph.edges(data=True) 
+                            if 'crime_score' in data)
+        
+        if enhanced_edges > 0:
+            logger.info(f"Graph already enhanced with {enhanced_edges} edges - skipping enhancement")
+            return graph
+        
+        # EXACTLY the same enhancement logic as current implementation
         logger.info("Enhancing graph with crime weights...")
         
         if self.crime_weighter is None:
             raise RuntimeError("Crime weighter must be initialized before enhancing graph")
         
-        # Initialize graph enhancer
+        # Initialize graph enhancer (EXACTLY as current implementation)
         self.graph_enhancer = GraphEnhancer(self.crime_weighter, self.config)
         
-        # Add crime weights to edges
+        # Add crime weights to edges (EXACTLY as current implementation)
         enhanced_graph = self.graph_enhancer.add_crime_weights(graph)
         
-        # Validate enhancement
+        # Validate enhancement (EXACTLY as current implementation)
         if not self.graph_enhancer.validate_enhanced_graph(enhanced_graph):
             logger.warning("Graph enhancement validation failed")
         
-        # Log enhancement statistics
+        # Log enhancement statistics (EXACTLY as current implementation)
         stats = self.graph_enhancer.get_enhancement_statistics(enhanced_graph)
         logger.info(f"Graph enhancement completed: {stats['enhancement_rate']:.1%} edges enhanced")
         

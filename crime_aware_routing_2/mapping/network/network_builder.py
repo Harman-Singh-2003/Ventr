@@ -60,7 +60,7 @@ def build_network(start_coords: Tuple[float, float],
         if not cache.large_graph:
             cache.load_cache()
         
-        if cache.is_route_in_cache(start_coords, end_coords, buffer_m=network_radius):
+        if cache.is_route_in_cache(start_coords, end_coords, buffer_m=0):
             logger.info("Route is within cached area - using full cached graph (no extraction)")
             
             # Extract from cache with buffer for the route

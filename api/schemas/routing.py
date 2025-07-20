@@ -61,6 +61,7 @@ class RouteResponse(BaseModel):
     route_geojson: Optional[Dict[str, Any]] = Field(default=None, description="Route as GeoJSON FeatureCollection")
     route_stats: Optional[RouteStats] = Field(default=None, description="Route statistics")
     shortest_path_stats: Optional[RouteStats] = Field(default=None, description="Shortest path statistics for comparison")
+    enhanced_cache_used: Optional[bool] = Field(default=None, description="Whether enhanced cache was used for this calculation")
 
 
 class HealthResponse(BaseModel):
@@ -71,6 +72,13 @@ class HealthResponse(BaseModel):
     crime_incidents_count: int = Field(..., description="Number of crime incidents loaded")
     network_cache_available: bool = Field(..., description="Whether network cache is available")
     cache_coverage_km: float = Field(..., description="Network cache coverage radius in kilometers")
+    enhanced_cache_available: bool = Field(..., description="Whether enhanced graph cache is available")
+    enhanced_cache_enhanced_edges: int = Field(..., description="Number of enhanced edges in cache")
+    
+    # NEW FIELDS for memory optimization tracking
+    active_cache_strategy: str = Field(..., description="Active cache strategy: enhanced, network, or none")
+    memory_optimized: bool = Field(..., description="Whether memory optimization is active")
+    estimated_memory_usage_gb: float = Field(..., description="Estimated memory usage in GB")
 
 
 class MultipleRouteRequest(BaseModel):
@@ -100,6 +108,7 @@ class MultipleRouteResponse(BaseModel):
     safest_route: Optional[Dict[str, Any]] = Field(default=None, description="Safest route data")
     safest_stats: Optional[RouteStats] = Field(default=None, description="Safest route statistics")
     comparison_stats: Optional[Dict[str, Any]] = Field(default=None, description="Comparison statistics between routes")
+    enhanced_cache_used: Optional[bool] = Field(default=None, description="Whether enhanced cache was used for this calculation")
 
 
 class ErrorResponse(BaseModel):

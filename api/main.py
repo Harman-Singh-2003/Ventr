@@ -33,10 +33,42 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Crime-Aware Routing API...")
     
+    # MEMORY OPTIMIZATION: Load enhanced cache in worker process where API requests run
+    logger.info("🔒 Loading enhanced cache in worker process...")
+    try:
+        from crime_aware_routing_2.mapping.network.enhanced_graph_cache import ensure_enhanced_cache, get_enhanced_cache
+        from api.services.routing_service import CrimeAwareRoutingService
+        
+        # Get crime data path from routing service
+        temp_service = CrimeAwareRoutingService()
+        crime_data_path = temp_service._get_crime_data_path()
+        
+        # Load enhanced cache in worker process
+        enhanced_cache_ready = ensure_enhanced_cache(crime_data_path)
+        if enhanced_cache_ready:
+            enhanced_cache = get_enhanced_cache()
+            if enhanced_cache.enhanced_graph is not None:
+                nodes_count = len(enhanced_cache.enhanced_graph.nodes)
+                edges_count = len(enhanced_cache.enhanced_graph.edges)
+                enhanced_edges = sum(1 for _, _, data in enhanced_cache.enhanced_graph.edges(data=True) 
+                                   if 'crime_score' in data)
+                logger.info(f"✅ Enhanced cache loaded in worker process: {nodes_count:,} nodes, {edges_count:,} edges ({enhanced_edges:,} enhanced)")
+                logger.info("🚀 Memory optimization active - enhanced cache ready for API requests")
+            else:
+                logger.warning("⚠️ Enhanced cache file exists but graph not loaded in worker process")
+        else:
+            logger.warning("⚠️ Enhanced cache not available in worker process - API will use standard method")
+            
+    except Exception as e:
+        logger.error(f"⚠️ Enhanced cache loading failed in worker process: {e}")
+        logger.info("API will fall back to standard network building")
+    
     # Verify routing service is initialized
     health = routing_service.get_health_status()
     if health.crime_data_loaded:
         logger.info(f"✓ Routing service ready with {health.crime_incidents_count} crime incidents")
+        logger.info(f"✓ Active cache strategy: {health.active_cache_strategy}")
+        logger.info(f"✓ Memory optimized: {health.memory_optimized}")
     else:
         logger.warning("⚠ Routing service running in degraded mode - crime data not loaded")
     

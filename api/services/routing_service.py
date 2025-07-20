@@ -64,17 +64,47 @@ class CrimeAwareRoutingService:
     
     def get_health_status(self) -> HealthResponse:
         """Get the health status of the routing service."""
-        # Check network cache status
-        cache = get_network_cache()
-        cache_info = cache.get_cache_info()
+        from crime_aware_routing_2.mapping.network.enhanced_graph_cache import get_enhanced_cache
+        from crime_aware_routing_2.mapping.network.cache_strategy import get_cache_strategy
+        
+        # MEMORY OPTIMIZATION: Use cache strategy to determine active cache
+        cache_strategy = get_cache_strategy()
+        active_cache_info = cache_strategy.get_active_cache_info()
+        memory_info = cache_strategy.get_memory_usage_info()
+        
+        # Extract cache information based on active strategy
+        if active_cache_info['type'] == 'enhanced':
+            # Enhanced cache is primary (memory optimized)
+            cache_available = True
+            cache_coverage_km = active_cache_info['radius_km']
+            enhanced_cache_available = True
+            enhanced_cache_enhanced_edges = active_cache_info['enhanced_edges']
+        elif active_cache_info['type'] == 'network':
+            # Network cache fallback
+            cache_available = True
+            cache_coverage_km = active_cache_info['radius_km']
+            enhanced_cache_available = False
+            enhanced_cache_enhanced_edges = 0
+        else:
+            # No cache available
+            cache_available = False
+            cache_coverage_km = 0
+            enhanced_cache_available = False
+            enhanced_cache_enhanced_edges = 0
         
         return HealthResponse(
             status="healthy" if self.is_initialized else "degraded",
             version="2.0.0",  # Updated to reflect refactored codebase
             crime_data_loaded=self.is_initialized,
             crime_incidents_count=len(self.crime_data) if self.crime_data else 0,
-            network_cache_available=cache_info.get('available', False),
-            cache_coverage_km=cache_info.get('radius_km', 0) if cache_info.get('available') else 0
+            network_cache_available=cache_available,
+            cache_coverage_km=cache_coverage_km,
+            enhanced_cache_available=enhanced_cache_available,
+            enhanced_cache_enhanced_edges=enhanced_cache_enhanced_edges,
+            # NEW FIELDS for memory optimization tracking
+            active_cache_strategy=active_cache_info['type'],
+            memory_optimized=memory_info['memory_optimized'],
+            estimated_memory_usage_gb=memory_info['estimated_memory_gb']
         )
     
     def calculate_route(self, request: RouteRequest) -> RouteResponse:
@@ -142,6 +172,26 @@ class CrimeAwareRoutingService:
             config_time = time.perf_counter() - config_start_time
             logger.info(f"Configuration setup completed in {config_time:.3f}s")
             
+            # Check if enhanced cache should be used
+            use_enhanced_cache = getattr(request, 'use_enhanced_cache', True)  # Default to True
+            enhanced_cache_used = False
+            
+            if use_enhanced_cache:
+                from crime_aware_routing_2.mapping.network.enhanced_graph_cache import get_enhanced_cache
+                enhanced_cache = get_enhanced_cache()
+                
+                if enhanced_cache.is_cache_available():
+                    # Check if route is within enhanced cache coverage
+                    if enhanced_cache.is_route_in_cache(start_coords, end_coords):
+                        logger.info("✓ Route within enhanced cache coverage - using optimized path")
+                        enhanced_cache_used = True
+                    else:
+                        logger.info("Route outside enhanced cache coverage - using standard method")
+                else:
+                    logger.info("Enhanced cache not available - using standard method")
+            else:
+                logger.info("Enhanced cache disabled by request - using standard method")
+            
             # Initialize route optimizer based on route type
             optimizer_start_time = time.perf_counter()
             
@@ -164,6 +214,11 @@ class CrimeAwareRoutingService:
             route_calc_time = time.perf_counter() - route_calc_start_time
             
             logger.info(f"Route calculation completed using {request.route_type} configuration with algorithms: {algorithms} in {route_calc_time:.3f}s")
+            
+            # Add enhanced cache usage info to result metadata
+            if 'metadata' not in result:
+                result['metadata'] = {}
+            result['metadata']['enhanced_cache_used'] = result.get('metadata', {}).get('enhanced_cache_used', False)
             
             # Convert result to API response format
             response_start_time = time.perf_counter()
@@ -257,6 +312,11 @@ class CrimeAwareRoutingService:
             
             logger.info(f"Multiple route calculation completed with algorithms: {algorithms} in {route_calc_time:.3f}s")
             
+            # Add enhanced cache usage info to result metadata
+            if 'metadata' not in result:
+                result['metadata'] = {}
+            result['metadata']['enhanced_cache_used'] = result.get('metadata', {}).get('enhanced_cache_used', False)
+            
             # Process results
             response_start_time = time.perf_counter()
             response = self._convert_to_multiple_response(result, request)
@@ -320,12 +380,16 @@ class CrimeAwareRoutingService:
             # Calculate route statistics
             route_stats = self._calculate_route_stats(primary_route)
             
+            # Get enhanced cache info from metadata
+            enhanced_cache_used = result.get('metadata', {}).get('enhanced_cache_used', None)
+            
             return RouteResponse(
                 success=True,
                 message="Route calculated successfully",
                 route_geojson=route_geojson,
                 route_stats=route_stats,
-                shortest_path_stats=None
+                shortest_path_stats=None,
+                enhanced_cache_used=enhanced_cache_used
             )
             
         except Exception as e:
@@ -381,6 +445,9 @@ class CrimeAwareRoutingService:
                 if shortest_stats.total_distance_m > 0:
                     safest_stats.detour_factor = safest_stats.total_distance_m / shortest_stats.total_distance_m
             
+            # Get enhanced cache info from metadata
+            enhanced_cache_used = result.get('metadata', {}).get('enhanced_cache_used', None)
+            
             return MultipleRouteResponse(
                 success=True,
                 message="Multiple routes calculated successfully",
@@ -388,7 +455,8 @@ class CrimeAwareRoutingService:
                 shortest_stats=shortest_stats,
                 safest_route=safest_geojson,
                 safest_stats=safest_stats,
-                comparison_stats=comparison_stats
+                comparison_stats=comparison_stats,
+                enhanced_cache_used=enhanced_cache_used
             )
             
         except Exception as e:

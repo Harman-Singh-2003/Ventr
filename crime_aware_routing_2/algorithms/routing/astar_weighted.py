@@ -113,14 +113,16 @@ class WeightedAStarRouter:
             logger.info(f"Graph validation passed: {weighted_edges}/{len(sample_edges)} sample edges have weights")
     
     def find_route(self, start_node: int, end_node: int, 
-                  weight_attr: str = 'weighted_length') -> RouteDetails:
+                  weight_attr: str = 'weighted_length', 
+                  crime_multiplier: float = 1.0) -> RouteDetails:
         """
         Find optimal route using weighted A* algorithm.
         
         Args:
             start_node: Starting node ID
             end_node: Ending node ID
-            weight_attr: Edge attribute to use for weights
+            weight_attr: Edge attribute to use for weights ('weighted_length' or 'length')
+            crime_multiplier: Additional multiplier for crime penalties (1.0 = normal, 2.0 = double crime penalty)
             
         Returns:
             RouteDetails object with path and metrics
@@ -128,15 +130,22 @@ class WeightedAStarRouter:
         start_time = time.time()
         
         try:
-            logger.debug(f"Finding route from {start_node} to {end_node} using {weight_attr}")
+            logger.debug(f"Finding route from {start_node} to {end_node} using {weight_attr}, crime_multiplier={crime_multiplier}")
             
-            # Use NetworkX A* with custom weight and heuristic
-            path = nx.astar_path(
+            # Use custom weight function if crime multiplier is specified
+            if crime_multiplier != 1.0 and weight_attr == 'weighted_length':
+                weight_function = lambda u, v, d: self._dynamic_weight_function(u, v, d, crime_multiplier)
+                logger.info(f"Using dynamic crime scaling: {crime_multiplier}x crime penalty (using Dijkstra for predictable results)")
+            else:
+                weight_function = weight_attr
+                logger.info("Using standard enhanced graph weights (using Dijkstra for predictable results)")
+            
+            # Use Dijkstra for all routing for more predictable results
+            path = nx.dijkstra_path(
                 self.graph,
                 start_node,
                 end_node,
-                heuristic=self._heuristic_function,
-                weight=weight_attr
+                weight=weight_function
             )
             
             calculation_time = time.time() - start_time
@@ -231,8 +240,52 @@ class WeightedAStarRouter:
             # Fallback if coordinates missing
             return 0.0
     
+    def _dynamic_weight_function(self, u: int, v: int, edge_data: Dict[str, Any], 
+                                crime_multiplier: float) -> float:
+        """
+        Dynamic weight function that simulates rebuilding the enhanced graph with higher crime_weight.
+        
+        The enhanced graph was built with: distance_weight=0.9, crime_weight=0.1, penalty_scale=200.0
+        This function simulates what would happen if we rebuilt it with a higher effective crime_weight.
+        
+        Args:
+            u: Source node ID
+            v: Target node ID  
+            edge_data: Edge data dictionary
+            crime_multiplier: Effective crime_weight multiplier (1.0=original 0.1, 5.0=0.5 crime_weight)
+            
+        Returns:
+            Dynamically calculated edge weight that simulates higher crime_weight
+        """
+        try:
+            # Get components from enhanced graph
+            base_distance = edge_data.get('length', 1.0)
+            crime_score = edge_data.get('crime_score', 0.0)
+            
+            # Calculate new weight distribution based on crime_multiplier
+            # crime_multiplier=1.0 -> crime_weight=0.1 (original)
+            # crime_multiplier=5.0 -> crime_weight=0.5 (5x stronger crime influence)
+            original_crime_weight = 0.1
+            new_crime_weight = min(original_crime_weight * crime_multiplier, 0.9)  # Cap at 90%
+            new_distance_weight = 1.0 - new_crime_weight
+            
+            # Rebuild the weight using original components with new proportions
+            penalty_scale = 200.0  # Same as enhanced graph
+            crime_penalty = crime_score * penalty_scale
+            
+            dynamic_weight = (new_distance_weight * base_distance) + (new_crime_weight * crime_penalty)
+            
+            # Ensure positive weight
+            return max(dynamic_weight, 0.1)
+            
+        except Exception as e:
+            logger.debug(f"Error in dynamic weight calculation: {e}")
+            # Fallback to pre-calculated weighted_length
+            return edge_data.get('weighted_length', edge_data.get('length', 1.0))
+    
     def find_multiple_routes(self, start_node: int, end_node: int, 
-                           algorithms: Optional[List[str]] = None) -> Dict[str, RouteDetails]:
+                           algorithms: Optional[List[str]] = None,
+                           crime_multiplier: float = 1.0) -> Dict[str, RouteDetails]:
         """
         Find multiple routes using different algorithms for comparison.
         
@@ -240,6 +293,7 @@ class WeightedAStarRouter:
             start_node: Starting node ID
             end_node: Ending node ID
             algorithms: List of algorithm names to use
+            crime_multiplier: Crime penalty multiplier for weighted routes
             
         Returns:
             Dictionary mapping algorithm names to RouteDetails
@@ -254,7 +308,7 @@ class WeightedAStarRouter:
                 algorithm_start_time = time.time()
                 
                 if algorithm == 'weighted_astar':
-                    route = self.find_route(start_node, end_node, 'weighted_length')
+                    route = self.find_route(start_node, end_node, 'weighted_length', crime_multiplier)
                 elif algorithm == 'shortest_path':
                     route = self.find_route_shortest(start_node, end_node)
                 elif algorithm == 'fastest_path':
